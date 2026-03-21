@@ -1,0 +1,129 @@
+// Prisma schema for RiftTable
+// Using Supabase Postgres as the datasource
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// Auth — Supabase handles auth, we extend with profile data
+// ============================================================
+
+model Profile {
+  id          String   @id @default(uuid())
+  supabaseId  String   @unique @map("supabase_id")
+  displayName String   @map("display_name")
+  avatarUrl   String?  @map("avatar_url")
+  discordId   String?  @unique @map("discord_id")
+  reputation  Int      @default(0)
+  gamesPlayed Int      @default(0) @map("games_played")
+  gamesWon    Int      @default(0) @map("games_won")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  decks       Deck[]
+  sessions    GameSession[]
+
+  @@map("profiles")
+}
+
+// ============================================================
+// Card Data — Phase 4
+// ============================================================
+
+model Card {
+  id        String   @id @default(uuid())
+  name      String
+  type      CardType
+  set       String
+  setNumber String?  @map("set_number")
+  rarity    String?
+  imageUrl  String   @map("image_url")
+  cost      Int?
+  power     Int?
+  health    Int?
+  text      String?
+  zoneRules Json?    @map("zone_rules")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  deckCards DeckCard[]
+
+  @@unique([name, set])
+  @@map("cards")
+}
+
+enum CardType {
+  CHAMPION
+  DOMAIN
+  SPELL
+  ACTION
+  ARTIFACT
+}
+
+// ============================================================
+// Decks
+// ============================================================
+
+model Deck {
+  id        String   @id @default(uuid())
+  name      String
+  format    String   @default("standard")
+  ownerId   String   @map("owner_id")
+  owner     Profile  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cards DeckCard[]
+
+  @@map("decks")
+}
+
+model DeckCard {
+  id       String @id @default(uuid())
+  deckId   String @map("deck_id")
+  cardId   String @map("card_id")
+  quantity Int    @default(1)
+
+  deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  card Card @relation(fields: [cardId], references: [id])
+
+  @@unique([deckId, cardId])
+  @@map("deck_cards")
+}
+
+// ============================================================
+// Game Sessions
+// ============================================================
+
+model GameSession {
+  id        String     @id @default(uuid())
+  roomCode  String     @unique @map("room_code")
+  format    GameFormat
+  status    GameStatus @default(WAITING)
+  hostId    String     @map("host_id")
+  host      Profile    @relation(fields: [hostId], references: [id])
+  startedAt DateTime?  @map("started_at")
+  endedAt   DateTime?  @map("ended_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@map("game_sessions")
+}
+
+enum GameFormat {
+  ONE_V_ONE
+  FFA
+  TWO_V_TWO
+}
+
+enum GameStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
